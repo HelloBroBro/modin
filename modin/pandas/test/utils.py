@@ -951,7 +951,7 @@ def eval_io(
     comparator: obj
         Function to perform comparison.
     cast_to_str: bool
-        There could be some missmatches in dtypes, so we're
+        There could be some mismatches in dtypes, so we're
         casting the whole frame to `str` before comparison.
         See issue #1931 for details.
     check_exception_type: bool
@@ -1031,6 +1031,19 @@ def create_test_dfs(*args, **kwargs):
     return map(
         post_fn, [pd.DataFrame(*args, **kwargs), pandas.DataFrame(*args, **kwargs)]
     )
+
+
+def create_test_series(vals, sort=False, **kwargs):
+    if isinstance(vals, dict):
+        modin_series = pd.Series(vals[next(iter(vals.keys()))], **kwargs)
+        pandas_series = pandas.Series(vals[next(iter(vals.keys()))], **kwargs)
+    else:
+        modin_series = pd.Series(vals, **kwargs)
+        pandas_series = pandas.Series(vals, **kwargs)
+    if sort:
+        modin_series = modin_series.sort_values().reset_index(drop=True)
+        pandas_series = pandas_series.sort_values().reset_index(drop=True)
+    return modin_series, pandas_series
 
 
 def generate_dfs():
