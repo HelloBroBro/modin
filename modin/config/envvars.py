@@ -390,13 +390,6 @@ class TestDatasetSize(EnvironmentVariable, type=str):
     choices = ("Small", "Normal", "Big")
 
 
-class TestRayClient(EnvironmentVariable, type=bool):
-    """Set to true to start and connect Ray client before a testing session starts."""
-
-    varname = "MODIN_TEST_RAY_CLIENT"
-    default = False
-
-
 class TrackFileLeaks(EnvironmentVariable, type=bool):
     """Whether to track for open file handles leakage during testing."""
 
@@ -828,6 +821,13 @@ class LazyExecution(EnvironmentVariable, type=bool):
 
     varname = "MODIN_LAZY_EXECUTION"
     default = False
+
+
+class DaskThreadsPerWorker(EnvironmentVariable, type=int):
+    """Number of threads per Dask worker."""
+
+    varname = "MODIN_DASK_THREADS_PER_WORKER"
+    default = 1
 
 
 def _check_vars() -> None:
