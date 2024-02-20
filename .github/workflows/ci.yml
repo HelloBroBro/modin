@@ -26,18 +26,6 @@ env:
   MODIN_GITHUB_CI: true
 
 jobs:
-  lint-black-isort:
-    name: lint (black and isort)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: ./.github/actions/python-only
-      - run: pip install black>=24.1.0 isort>=5.12
-      # NOTE: keep the black command here in sync with the pre-commit hook in
-      # /contributing/pre-commit
-      - run: black --check --diff modin/ asv_bench/benchmarks scripts/doc_checker.py
-      - run: isort . --check-only
-
   lint-mypy:
     name: lint (mypy)
     runs-on: ubuntu-latest
@@ -78,7 +66,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-clean-install:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     strategy:
       matrix:
         os:
@@ -106,7 +94,7 @@ jobs:
         if: matrix.os == 'ubuntu'
 
   test-internals:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -131,7 +119,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-defaults:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -162,7 +150,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-hdk:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -219,7 +207,7 @@ jobs:
 
   test-asv-benchmarks:
     if: github.event_name == 'pull_request'
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -324,7 +312,7 @@ jobs:
               "${{ steps.filter.outputs.ray }}" "${{ steps.filter.outputs.dask }}" >> $GITHUB_OUTPUT
 
   test-all-unidist:
-    needs: [lint-flake8, lint-black-isort, execution-filter]
+    needs: [lint-flake8, execution-filter]
     if: github.event_name == 'push' || needs.execution-filter.outputs.unidist == 'true'
     runs-on: ubuntu-latest
     defaults:
@@ -399,7 +387,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-all:
-    needs: [lint-flake8, lint-black-isort, execution-filter]
+    needs: [lint-flake8, execution-filter]
     strategy:
       matrix:
         os:
@@ -533,7 +521,7 @@ jobs:
         if: matrix.os == 'windows'
 
   test-sanity:
-    needs: [lint-flake8, lint-black-isort, execution-filter]
+    needs: [lint-flake8, execution-filter]
     if: github.event_name == 'pull_request'
     strategy:
       matrix:
@@ -665,7 +653,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-experimental:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -694,7 +682,7 @@ jobs:
       - uses: ./.github/actions/upload-coverage
 
   test-spreadsheet:
-    needs: [lint-flake8, lint-black-isort]
+    needs: [lint-flake8]
     runs-on: ubuntu-latest
     defaults:
       run:
