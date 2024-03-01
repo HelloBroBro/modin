@@ -196,7 +196,7 @@ class PandasDataframe(ClassLogger):
     @classmethod
     def _get_lengths(cls, parts, axis):
         """
-        Get list of  dimensions for all the provided parts.
+        Get list of dimensions for all the provided parts.
 
         Parameters
         ----------
@@ -880,7 +880,7 @@ class PandasDataframe(ClassLogger):
         axis : int, default: None
             The axis to apply to. If it's None applies to both axes.
         """
-        self._filter_empties()
+        self._filter_empties(compute_metadata=False)
         if axis is None or axis == 0:
             cum_row_lengths = np.cumsum([0] + self.row_lengths)
         if axis is None or axis == 1:
@@ -931,7 +931,11 @@ class PandasDataframe(ClassLogger):
                                 slice(cum_row_lengths[i], cum_row_lengths[i + 1])
                             ],
                             length=self.row_lengths[i],
-                            width=self.column_widths[j],
+                            width=(
+                                self.column_widths[j]
+                                if self._column_widths_cache is not None
+                                else None
+                            ),
                         )
                         for j in range(len(self._partitions[i]))
                     ]
@@ -952,7 +956,11 @@ class PandasDataframe(ClassLogger):
                             cols=self.columns[
                                 slice(cum_col_widths[j], cum_col_widths[j + 1])
                             ],
-                            length=self.row_lengths[i],
+                            length=(
+                                self.row_lengths[i]
+                                if self._row_lengths_cache is not None
+                                else None
+                            ),
                             width=self.column_widths[j],
                         )
                         for j in range(len(self._partitions[i]))
@@ -3548,13 +3556,23 @@ class PandasDataframe(ClassLogger):
             Tuple containing:
                 1) 2-d NumPy array of aligned left partitions
                 2) list of 2-d NumPy arrays of aligned right partitions
-                3) joined index along ``axis``
-                4) List with sizes of partitions along axis that partitioning
-                   was done on. This list will be empty if and only if all
+                3) joined index along ``axis``, may be ``ModinIndex`` if not materialized
+                4) If materialized, list with sizes of partitions along axis that partitioning
+                   was done on, otherwise ``None``. This list will be empty if and only if all
                    the frames are empty.
         """
         if isinstance(other, type(self)):
             other = [other]
+
+        if not force_repartition and all(
+            o._check_if_axes_identical(self, axis) for o in other
+        ):
+            return (
+                self._partitions,
+                [o._partitions for o in other],
+                self.copy_axis_cache(axis, copy_lengths=True),
+                self._get_axis_lengths_cache(axis),
+            )
 
         self_index = self.get_axis(axis)
         others_index = [o.get_axis(axis) for o in other]
@@ -3684,15 +3702,19 @@ class PandasDataframe(ClassLogger):
         )
         if copartition_along_columns:
             new_left_frame = self.__constructor__(
-                left_parts, joined_index, self.columns, row_lengths, self.column_widths
+                left_parts,
+                joined_index,
+                self.copy_columns_cache(copy_lengths=True),
+                row_lengths,
+                self._column_widths_cache,
             )
             new_right_frames = [
                 self.__constructor__(
                     right_parts,
                     joined_index,
-                    right_frame.columns,
+                    right_frame.copy_columns_cache(copy_lengths=True),
                     row_lengths,
-                    right_frame.column_widths,
+                    right_frame._column_widths_cache,
                 )
                 for right_parts, right_frame in zip(list_of_right_parts, right_frames)
             ]
