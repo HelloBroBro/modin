@@ -734,7 +734,12 @@ def test_aggregate_error_checking(data):
         lambda series: series.aggregate("cumprod"),
     )
     eval_general(
-        modin_series, pandas_series, lambda series: series.aggregate("NOT_EXISTS")
+        modin_series,
+        pandas_series,
+        lambda series: series.aggregate("NOT_EXISTS"),
+        raising_exceptions=AttributeError(
+            "'NOT_EXISTS' is not a valid function for 'Series' object"
+        ),
     )
 
 
@@ -3262,11 +3267,11 @@ def test_sum(data, skipna, numeric_only, min_count):
 
 @pytest.mark.parametrize("operation", ["sum", "shift"])
 def test_sum_axis_1_except(operation):
-    # ValueError('No axis named 1 for object type Series')
     eval_general(
         *create_test_series(test_data["int_data"]),
         lambda df, *args, **kwargs: getattr(df, operation)(*args, **kwargs),
         axis=1,
+        raising_exceptions=ValueError("No axis named 1 for object type Series"),
     )
 
 

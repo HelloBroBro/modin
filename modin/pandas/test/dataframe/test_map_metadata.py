@@ -439,6 +439,9 @@ def test_astype():
             if isinstance(df, pd.DataFrame)
             else pandas.Series([str, str], index=["col1", "col1"])
         ),
+        raising_exceptions=ValueError(
+            "cannot reindex on an axis with duplicate labels"
+        ),
     )
 
 
@@ -1341,7 +1344,15 @@ def test_insert(data):
     )
 
     # Bad inserts
-    eval_insert(modin_df, pandas_df, col="Bad Column", value=lambda df: df)
+    eval_insert(
+        modin_df,
+        pandas_df,
+        col="Bad Column",
+        value=lambda df: df,
+        raising_exceptions=ValueError(
+            f"Expected a one-dimensional object, got a DataFrame with {len(pandas_df.columns)} columns instead."
+        ),
+    )
     eval_insert(
         modin_df,
         pandas_df,

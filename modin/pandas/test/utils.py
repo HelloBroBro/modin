@@ -37,7 +37,13 @@ from pandas.core.dtypes.common import (
 )
 
 import modin.pandas as pd
-from modin.config import MinPartitionSize, NPartitions, TestDatasetSize, TrackFileLeaks
+from modin.config import (
+    Engine,
+    MinPartitionSize,
+    NPartitions,
+    TestDatasetSize,
+    TrackFileLeaks,
+)
 from modin.pandas.io import to_pandas
 from modin.pandas.testing import (
     assert_extension_array_equal,
@@ -900,10 +906,24 @@ def eval_general(
                 ), "Got Modin Exception type {}, but pandas Exception type {} was expected".format(
                     type(md_e), type(pd_e)
                 )
-                if raising_exceptions:
+                if raising_exceptions and isinstance(raising_exceptions, (list, tuple)):
                     assert not isinstance(
                         md_e, tuple(raising_exceptions)
                     ), f"not acceptable exception type: {md_e}"
+                elif raising_exceptions and type(raising_exceptions) is not type:
+                    if Engine.get() == "Ray":
+                        from ray.exceptions import RayTaskError
+
+                        # unwrap ray exceptions from remote worker
+                        if isinstance(md_e, RayTaskError):
+                            md_e = md_e.args[0]
+                    assert (
+                        type(md_e) is type(raising_exceptions)
+                        and md_e.args == raising_exceptions.args
+                    ), f"not acceptable Modin's exception: [{repr(md_e)}]"
+                    assert (
+                        pd_e.args == raising_exceptions.args
+                    ), f"not acceptable Pandas' exception: [{repr(pd_e)}]"
             else:
                 raise NoModinException(
                     f"Modin doesn't throw an exception, while pandas does: [{repr(pd_e)}]"

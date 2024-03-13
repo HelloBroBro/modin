@@ -414,7 +414,7 @@ class BasePandasDataset(ClassLogger):
             if isinstance(fn, str):
                 if not (hasattr(self, fn) or hasattr(np, fn)):
                     on_invalid(
-                        f"{fn} is not valid function for {type(self)} object.",
+                        f"'{fn}' is not a valid function for '{type(self).__name__}' object",
                         AttributeError,
                     )
             elif not callable(fn):
@@ -1005,11 +1005,7 @@ class BasePandasDataset(ClassLogger):
         # convert it to a dict before passing it to the query compiler.
         if isinstance(dtype, (pd.Series, pandas.Series)):
             if not dtype.index.is_unique:
-                raise ValueError(
-                    "The new Series of types must have a unique index, i.e. "
-                    + "it must be one-to-one mapping from column names to "
-                    + " their new dtypes."
-                )
+                raise ValueError("cannot reindex on an axis with duplicate labels")
             dtype = {column: dtype for column, dtype in dtype.items()}
         # If we got a series or dict originally, dtype is a dict now. Its keys
         # must be column names.
