@@ -954,7 +954,40 @@ class PandasQueryCompiler(BaseQueryCompiler):
             return self.default_to_pandas(pandas.DataFrame.median, axis=axis, **kwargs)
         return Reduce.register(pandas.DataFrame.median)(self, axis=axis, **kwargs)
 
-    nunique = Reduce.register(pandas.DataFrame.nunique)
+    def nunique(self, axis=0, dropna=True):
+        if not RangePartitioning.get():
+            return Reduce.register(pandas.DataFrame.nunique)(
+                self, axis=axis, dropna=dropna
+            )
+
+        unsupported_message = ""
+        if axis != 0:
+            unsupported_message += (
+                "Range-partitioning 'nunique()' is only supported for 'axis=0'.\n"
+            )
+
+        if len(self.columns) > 1:
+            unsupported_message += "Range-partitioning 'nunique()' is only supported for a signle-column dataframe.\n"
+
+        if len(unsupported_message) > 0:
+            message = (
+                f"Can't use range-partitioning implementation for 'nunique' because:\n{unsupported_message}"
+                + "Falling back to a full-axis reduce implementation."
+            )
+            get_logger().info(message)
+            ErrorMessage.warn(message)
+            return Reduce.register(pandas.DataFrame.nunique)(
+                self, axis=axis, dropna=dropna
+            )
+
+        # compute '.nunique()' for each row partitions
+        new_modin_frame = self._modin_frame._apply_func_to_range_partitioning(
+            key_columns=self.columns.tolist(),
+            func=lambda df: df.nunique(dropna=dropna).to_frame(),
+        )
+        # sum the results of each row part to get the final value
+        new_modin_frame = new_modin_frame.reduce(axis=0, function=lambda df: df.sum())
+        return self.__constructor__(new_modin_frame, shape_hint="column")
 
     def skew(self, axis, **kwargs):
         if axis is None:
@@ -1900,13 +1933,36 @@ class PandasQueryCompiler(BaseQueryCompiler):
 
     # END String map partitions operations
 
-    def unique(self):
-        new_modin_frame = self._modin_frame.apply_full_axis(
-            0,
-            lambda x: x.squeeze(axis=1).unique(),
-            new_columns=self.columns,
+    def unique(self, keep="first", ignore_index=True, subset=None):
+        # kernels with 'pandas.Series.unique()' work faster
+        can_use_unique_kernel = (
+            subset is None and ignore_index and len(self.columns) == 1 and keep
         )
-        return self.__constructor__(new_modin_frame)
+
+        if not can_use_unique_kernel and not RangePartitioning.get():
+            return super().unique(keep=keep, ignore_index=ignore_index, subset=subset)
+
+        if RangePartitioning.get():
+            new_modin_frame = self._modin_frame._apply_func_to_range_partitioning(
+                key_columns=self.columns.tolist() if subset is None else subset,
+                func=(
+                    (lambda df: pandas.DataFrame(df.squeeze(axis=1).unique()))
+                    if can_use_unique_kernel
+                    else (
+                        lambda df: df.drop_duplicates(
+                            keep=keep, ignore_index=ignore_index, subset=subset
+                        )
+                    )
+                ),
+                preserve_columns=True,
+            )
+        else:
+            new_modin_frame = self._modin_frame.apply_full_axis(
+                0,
+                lambda x: x.squeeze(axis=1).unique(),
+                new_columns=self.columns,
+            )
+        return self.__constructor__(new_modin_frame, shape_hint=self._shape_hint)
 
     def searchsorted(self, **kwargs):
         def searchsorted(df):
